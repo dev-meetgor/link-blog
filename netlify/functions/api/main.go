@@ -131,7 +131,43 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		authInfo, ok := req.RequestContext.Authorizer["user_id"].(int)
 		log.Printf("authInfo: %v | ok: %v", authInfo, ok)
 		if !ok {
-			return errorResponse(http.StatusInternalServerError, "Claims not found in authorizer"), nil
+			if email == "" || password == "" {
+				return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
+			}
+			user, err := queries.GetUserByEmail(ctx, email)
+			log.Printf("user: %v | err: %v", user, err)
+			if err != nil {
+				return errorResponse(http.StatusInternalServerError, "Database connection failed"), nil
+			}
+			if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+				return errorResponse(http.StatusUnauthorized, "Invalid username or password"), nil
+			}
+
+			token, err := CreateToken(user, os.Getenv("JWT_SECRET"))
+			log.Printf("token: %v | err: %v", token, err)
+			if err != nil {
+				return errorResponse(http.StatusInternalServerError, "Failed to create token"), nil
+			}
+			tokenCookie := http.Cookie{
+				Name:     "auth_token",
+				Value:    token,
+				HttpOnly: true,
+				Secure:   true,
+				SameSite: http.SameSiteStrictMode,
+				Path:     "/",
+				Expires:  time.Now().Add(24 * time.Hour),
+			}
+			headers := map[string]string{
+				"Content-Type": "text/plain",
+				"Set-Cookie":   tokenCookie.String(),
+			}
+			log.Printf("header: %v | err: %v", headers, err)
+			return events.APIGatewayProxyResponse{
+				StatusCode: http.StatusOK,
+				Headers:    headers,
+				Body:       "Login successful",
+			}, nil
+
 		} else {
 			postTitle := formData.Get("title")
 			postLink := formData.Get("link")
