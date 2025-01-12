@@ -105,6 +105,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	}
 	email := formData.Get("email")
 	password := formData.Get("password")
+    log.Printf("authorizer: %v", req.RequestContext.Authorizer)
 	authInfo, ok := req.RequestContext.Authorizer["user_id"].(int64)
 	log.Printf("authInfo: %v | ok: %v", authInfo, ok)
 	if !ok {
