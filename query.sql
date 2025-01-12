@@ -10,6 +10,11 @@ SELECT *
 FROM users
 WHERE username = ?;
 
+-- name: GetUserByEmail :one
+SELECT *
+FROM users
+WHERE email = ?;
+
 -- Posts
 
 -- name: CreatePost :one
