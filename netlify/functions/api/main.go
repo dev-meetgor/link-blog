@@ -105,23 +105,20 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	}
 	email := formData.Get("email")
 	password := formData.Get("password")
-	authInfo, ok := req.RequestContext.Authorizer["claims"].(map[string]interface{})
+	authInfo, ok := req.RequestContext.Authorizer["user_id"].(int64)
 	if !ok {
 		return errorResponse(http.StatusInternalServerError, "Claims not found in authorizer"), nil
 	} else {
 		postTitle := formData.Get("title")
 		postLink := formData.Get("link")
 		postContent := formData.Get("content")
-		if authInfo["user_id"] == nil {
-			return errorResponse(http.StatusInternalServerError, "User ID not found in claims"), nil
-		}
 
 		if postTitle != "" && postContent != "" {
 			post, err := queries.CreatePost(ctx, models.CreatePostParams{
 				Title:    postTitle,
 				Url:      postLink,
 				Content:  postContent,
-				AuthorID: authInfo["user_id"].(int64),
+				AuthorID: authInfo,
 				Slug: sql.NullString{
 					String: slugify(postTitle),
 					Valid:  true,
