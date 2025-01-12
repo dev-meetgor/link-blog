@@ -106,7 +106,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	email := formData.Get("email")
 	password := formData.Get("password")
 	log.Printf("authorizer: %v", req.RequestContext.Authorizer)
-	authInfo, ok := req.RequestContext.Authorizer["user_id"]
+	authInfo, ok := req.RequestContext.Authorizer["user_id"].(int)
 	log.Printf("authInfo: %v | ok: %v", authInfo, ok)
 	if !ok {
 		return errorResponse(http.StatusInternalServerError, "Claims not found in authorizer"), nil
@@ -120,7 +120,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 				Title:    postTitle,
 				Url:      postLink,
 				Content:  postContent,
-				AuthorID: authInfo.(int64),
+				AuthorID: int64(authInfo),
 				Slug: sql.NullString{
 					String: slugify(postTitle),
 					Valid:  true,
