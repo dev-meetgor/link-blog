@@ -29,8 +29,11 @@ var (
 func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)) func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	return func(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 		var tokenString string
-		for _, cookie := range req.Headers["Cookie"] {
+		cookies := getHeader(req.Headers, "Cookie")
+		log.Printf("cookies: %v", cookies)
+		for _, cookie := range strings.Split(cookies, ";") {
 			c := string(cookie)
+			log.Printf("c: %v", c)
 			parts := strings.SplitN(c, "=", 2)
 			log.Printf("parts: %v", parts)
 			if len(parts) == 2 && parts[0] == "auth_token" {
@@ -46,7 +49,7 @@ func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.
 
 		log.Printf("tokenString C: %v", tokenString)
 		claims, err := ValidateToken(tokenString, os.Getenv("JWT_SECRET"))
-        log.Printf("tokenString D: %v", tokenString)
+		log.Printf("tokenString D: %v", tokenString)
 		if err != nil {
 			if err == jwt.ErrSignatureInvalid {
 				return errorResponse(http.StatusUnauthorized, "Invalid token signature"), nil
@@ -161,4 +164,18 @@ func ValidateToken(tokenString string, secret string) (*jwt.Token, error) {
 	return jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		return []byte(secret), nil
 	})
+}
+
+func getHeader(headers map[string]string, key string) string {
+	if val, ok := headers[key]; ok {
+		return val
+	}
+
+	lowerKey := strings.ToLower(key)
+	for k, v := range headers {
+		if strings.ToLower(k) == lowerKey {
+			return v
+		}
+	}
+	return ""
 }
