@@ -27,21 +27,18 @@ document.body.addEventListener('htmx:afterSwap', (event) => {
         event.detail.target.closest('form').reset();
     }
     if (event.detail.target.id === 'auth-section') {
-      // Check if login was successful (you'll need to send a specific response from your function)
-      if (event.detail.xhr.status === 200) {
-        // Hide auth forms and show add link form
-        document.getElementById('auth-section').classList.add('hidden');
-        document.getElementById('add-link-section').classList.remove('hidden');
-      } else {
-        //If not successful display error message
-        const errorMessage = JSON.parse(event.detail.xhr.response).message
-        alert(errorMessage)
-      }
+        if (event.detail.xhr.status === 200) {
+            document.getElementById('auth-section').classList.add('hidden');
+            document.getElementById('add-link-section').innerHTML = ""; // Clear existing content
+            htmx.ajax('GET', '/add-link', '#add-link-section');
+            document.getElementById('add-link-section').classList.remove('hidden');
+        } else {
+            const errorMessage = JSON.parse(event.detail.xhr.response).message
+            alert(errorMessage)
+        }
     }
 });
 
-// Load auth forms on initial load
 document.addEventListener('DOMContentLoaded', () => {
-  htmx.ajax('GET', '/login', '#login-form');
-  htmx.ajax('GET', '/signup', '#signup-form');
+    htmx.ajax('GET', '/login', '#login-form');
 });
