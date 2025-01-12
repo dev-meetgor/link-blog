@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Link Blog</title>
+    <script src="https://unpkg.com/htmx.org@1.9.4"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+    </style>
+</head>
+<body class="bg-gray-100 p-8">
+
+    <header class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-800">Link Blog</h1>
+        <p class="text-gray-600">Sharing interesting links and thoughts.</p>
+    </header>
+
+    <main class="container mx-auto max-w-3xl">
+
+        <div id="links-list" class="space-y-4">
+            <div class="text-center py-4 text-gray-500" id="loading-indicator">Loading links...</div>
+        </div>
+
+        <div class="mt-8 bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold text-gray-800 mb-4">Add a New Link</h2>
+            <form hx-post="/.netlify/functions/api/links" hx-target="#links-list" hx-swap="beforeend" hx-indicator="#form-loading-indicator">
+                <div class="mb-4">
+                    <label for="url" class="block text-gray-700 font-medium mb-2">URL:</label>
+                    <input type="text" id="url" name="url" class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring focus:ring-blue-300" required>
+                </div>
+                <div class="mb-4">
+                    <label for="title" class="block text-gray-700 font-medium mb-2">Title (Optional):</label>
+                    <input type="text" id="title" name="title" class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring focus:ring-blue-300">
+                </div>
+                <div class="mb-6">
+                    <label for="commentary" class="block text-gray-700 font-medium mb-2">Commentary:</label>
+                    <textarea id="commentary" name="commentary" rows="4" class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring focus:ring-blue-300" required></textarea>
+                </div>
+                <div class="flex justify-between items-center">
+                  <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+                      Add Link
+                  </button>
+                  <span id="form-loading-indicator" class="text-gray-500 hidden">Submitting...</span>
+                </div>
+
+            </form>
+        </div>
+
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', (event) => {
+            fetch('/.netlify/functions/api/links')
+                .then(res => res.json())
+                .then(links => {
+                    const linksList = document.getElementById('links-list');
+                    document.getElementById('loading-indicator').style.display = 'none'; // Hide loading indicator
+                    links.forEach(link => {
+                        linksList.innerHTML += `
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <a href="${link.url}" target="_blank" class="text-blue-600 font-medium hover:underline">${link.title || link.url}</a>
+                            <p class="mt-2 text-gray-700">${link.commentary}</p>
+                        </div>`;
+                    });
+                });
+        });
+
+        // Show loading indicator during form submission
+        document.body.addEventListener('htmx:beforeSwap', (event) => {
+          if (event.detail.target.id === 'links-list') {
+            document.getElementById('form-loading-indicator').classList.remove('hidden');
+          }
+        });
+        document.body.addEventListener('htmx:afterSwap', (event) => {
+          if (event.detail.target.id === 'links-list') {
+            document.getElementById('form-loading-indicator').classList.add('hidden');
+            event.detail.target.scrollIntoView({ behavior: 'smooth' }); // Scroll to new content
+            event.detail.target.closest('form').reset();
+          }
+        });
+    </script>
+
+</body>
+</html>
