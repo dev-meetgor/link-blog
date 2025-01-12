@@ -1,0 +1,21 @@
+<h2 class="text-xl font-semibold text-gray-800 mb-4">Add a New Link</h2>
+<form hx-post="/.netlify/functions/api/links" hx-target="#links-list" hx-swap="beforeend" hx-indicator="#form-loading-indicator">
+    <div class="mb-4">
+        <label for="url" class="block text-gray-700 font-medium mb-2">URL:</label>
+        <input type="text" id="url" name="url" class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring focus:ring-blue-300" required>
+    </div>
+    <div class="mb-4">
+        <label for="title" class="block text-gray-700 font-medium mb-2">Title (Optional):</label>
+        <input type="text" id="title" name="title" class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring focus:ring-blue-300">
+    </div>
+    <div class="mb-6">
+        <label for="commentary" class="block text-gray-700 font-medium mb-2">Commentary:</label>
+        <textarea id="commentary" name="commentary" rows="4" class="w-full border border-gray-300 rounded-md px-4 py-2 focus:ring focus:ring-blue-300" required></textarea>
+    </div>
+    <div class="flex justify-between items-center">
+      <button type="submit" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">
+          Add Link
+      </button>
+      <span id="form-loading-indicator" class="text-gray-500 hidden">Submitting...</span>
+    </div>
+</form>
