@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -30,17 +31,12 @@ var (
 func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)) func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	return func(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 		var tokenString string
-		log.Printf("req.Headers: %v", req.Headers)
 		cookies := getHeader(req.Headers, "Cookie")
-		log.Printf("cookies: %v", cookies)
 		for _, cookie := range strings.Split(cookies, ";") {
 			c := string(cookie)
-			log.Printf("c: %v", c)
 			parts := strings.SplitN(c, "=", 2)
-			log.Printf("parts: %v", parts)
 			if len(parts) == 2 && parts[0] == "auth_token" {
 				tokenString = parts[1]
-				log.Printf("tokenString: %v", tokenString)
 				break
 			}
 		}
@@ -49,9 +45,7 @@ func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.
 			return next(req)
 		}
 
-		log.Printf("tokenString C: %v", tokenString)
 		claims, err := ValidateToken(tokenString, os.Getenv("JWT_SECRET"))
-		log.Printf("tokenString D: %v", tokenString)
 		if err != nil {
 			if err == jwt.ErrSignatureInvalid {
 				return errorResponse(http.StatusUnauthorized, "Invalid token signature"), nil
@@ -97,79 +91,111 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		log.Printf("error creating tables: %v", err)
 		return errorResponse(http.StatusInternalServerError, "Database connection failed"), nil
 	}
-
-	formData, err := url.ParseQuery(req.Body)
-	log.Printf("formData: %v", formData)
-	if err != nil {
-		return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
-	}
-	email := formData.Get("email")
-	password := formData.Get("password")
-	log.Printf("authorizer: %v", req.RequestContext.Authorizer)
-	authInfo, ok := req.RequestContext.Authorizer["user_id"].(int)
-	log.Printf("authInfo: %v | ok: %v", authInfo, ok)
-	if !ok {
-		return errorResponse(http.StatusInternalServerError, "Claims not found in authorizer"), nil
-	} else {
-		postTitle := formData.Get("title")
-		postLink := formData.Get("link")
-		postContent := formData.Get("content")
-
-		if postTitle != "" && postContent != "" {
-			post, err := queries.CreatePost(ctx, models.CreatePostParams{
-				Title:    postTitle,
-				Url:      postLink,
-				Content:  postContent,
-				AuthorID: int64(authInfo),
-				Slug: sql.NullString{
-					String: slugify(postTitle),
-					Valid:  true,
-				},
-			})
-			log.Printf("post: %v | err: %v", post, err)
+	switch req.HTTPMethod {
+	case "GET":
+		authInfo, ok := req.RequestContext.Authorizer["user_id"].(int)
+		postIdStr, ok := req.QueryStringParameters["id"]
+		if postIdStr != "" && ok {
+			postId, err := strconv.Atoi(postIdStr)
 			if err != nil {
-				return errorResponse(http.StatusInternalServerError, "Failed to create post"), nil
+				return errorResponse(http.StatusBadRequest, "Invalid post ID"), nil
+			}
+			post, err := queries.GetPostByID(ctx, int64(postId))
+			if err != nil {
+				log.Printf("Error getting post: %v", err)
+				return errorResponse(http.StatusInternalServerError, "Error getting post"), nil
+			}
+			if post.AuthorID != int64(authInfo) {
+				return errorResponse(http.StatusUnauthorized, "Unauthorized"), nil
 			}
 			return jsonResponse(http.StatusOK, post), nil
+		} else {
+			posts, err := queries.ListPostsByAuthor(ctx, int64(authInfo))
+			if err != nil {
+				log.Printf("Error getting posts: %v", err)
+				return errorResponse(http.StatusInternalServerError, "Error getting posts"), nil
+			}
+			return jsonResponse(http.StatusOK, posts), nil
 		}
+
+	case "POST":
+
+		formData, err := url.ParseQuery(req.Body)
+		log.Printf("formData: %v", formData)
+		if err != nil {
+			return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
+		}
+		email := formData.Get("email")
+		password := formData.Get("password")
+		log.Printf("authorizer: %v", req.RequestContext.Authorizer)
+		authInfo, ok := req.RequestContext.Authorizer["user_id"].(int)
+		log.Printf("authInfo: %v | ok: %v", authInfo, ok)
+		if !ok {
+			return errorResponse(http.StatusInternalServerError, "Claims not found in authorizer"), nil
+		} else {
+			postTitle := formData.Get("title")
+			postLink := formData.Get("link")
+			postContent := formData.Get("content")
+
+			if postTitle != "" && postContent != "" {
+				post, err := queries.CreatePost(ctx, models.CreatePostParams{
+					Title:    postTitle,
+					Url:      postLink,
+					Content:  postContent,
+					AuthorID: int64(authInfo),
+					Slug: sql.NullString{
+						String: slugify(postTitle),
+						Valid:  true,
+					},
+				})
+				log.Printf("post: %v | err: %v", post, err)
+				if err != nil {
+					return errorResponse(http.StatusInternalServerError, "Failed to create post"), nil
+				}
+				return jsonResponse(http.StatusOK, post), nil
+			}
+		}
+
+		if email == "" || password == "" {
+			return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
+		}
+		user, err := queries.GetUserByEmail(ctx, email)
+		log.Printf("user: %v | err: %v", user, err)
+		if err != nil {
+			return errorResponse(http.StatusInternalServerError, "Database connection failed"), nil
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
+			return errorResponse(http.StatusUnauthorized, "Invalid username or password"), nil
+		}
+
+		token, err := CreateToken(user, os.Getenv("JWT_SECRET"))
+		log.Printf("token: %v | err: %v", token, err)
+		if err != nil {
+			return errorResponse(http.StatusInternalServerError, "Failed to create token"), nil
+		}
+		tokenCookie := http.Cookie{
+			Name:     "auth_token",
+			Value:    token,
+			HttpOnly: true,
+			Secure:   true,
+			SameSite: http.SameSiteStrictMode,
+			Path:     "/",
+			Expires:  time.Now().Add(24 * time.Hour),
+		}
+		headers := map[string]string{
+			"Content-Type": "text/plain",
+			"Set-Cookie":   tokenCookie.String(),
+		}
+		log.Printf("header: %v | err: %v", headers, err)
+		return events.APIGatewayProxyResponse{
+			StatusCode: http.StatusOK,
+			Headers:    headers,
+			Body:       "Login successful",
+		}, nil
+	default:
+		return errorResponse(http.StatusMethodNotAllowed, "Method not allowed"), nil
 	}
 
-	if email == "" || password == "" {
-		return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
-	}
-	user, err := queries.GetUserByEmail(ctx, email)
-	log.Printf("user: %v | err: %v", user, err)
-	if err != nil {
-		return errorResponse(http.StatusInternalServerError, "Database connection failed"), nil
-	}
-	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password)); err != nil {
-		return errorResponse(http.StatusUnauthorized, "Invalid username or password"), nil
-	}
-
-	token, err := CreateToken(user, os.Getenv("JWT_SECRET"))
-	log.Printf("token: %v | err: %v", token, err)
-	if err != nil {
-		return errorResponse(http.StatusInternalServerError, "Failed to create token"), nil
-	}
-	tokenCookie := http.Cookie{
-		Name:     "auth_token",
-		Value:    token,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Path:     "/",
-		Expires:  time.Now().Add(24 * time.Hour),
-	}
-	headers := map[string]string{
-		"Content-Type": "text/plain",
-		"Set-Cookie":   tokenCookie.String(),
-	}
-	log.Printf("header: %v | err: %v", headers, err)
-	return events.APIGatewayProxyResponse{
-		StatusCode: http.StatusOK,
-		Headers:    headers,
-		Body:       "Login successful",
-	}, nil
 }
 
 func jsonResponse(statusCode int, data interface{}) events.APIGatewayProxyResponse {
