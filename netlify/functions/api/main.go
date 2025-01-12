@@ -29,6 +29,7 @@ var (
 func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)) func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	return func(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 		var tokenString string
+        log.Printf("req.Headers: %v", req.Headers)
 		cookies := getHeader(req.Headers, "Cookie")
 		log.Printf("cookies: %v", cookies)
 		for _, cookie := range strings.Split(cookies, ";") {
