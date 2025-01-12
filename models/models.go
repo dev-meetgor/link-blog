@@ -12,8 +12,8 @@ type Post struct {
 	ID        int64
 	AuthorID  int64
 	Url       string
-	Title     sql.NullString
-	Content   sql.NullString
+	Title     string
+	Content   string
 	Slug      sql.NullString
 	CreatedAt sql.NullTime
 	UpdatedAt sql.NullTime

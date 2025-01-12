@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -104,6 +105,34 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	}
 	email := formData.Get("email")
 	password := formData.Get("password")
+	authInfo, ok := req.RequestContext.Authorizer["claims"].(map[string]interface{})
+	if !ok {
+		return errorResponse(http.StatusInternalServerError, "Claims not found in authorizer"), nil
+	} else {
+		postTitle := formData.Get("title")
+		postLink := formData.Get("link")
+		postContent := formData.Get("content")
+		if authInfo["user_id"] == nil {
+			return errorResponse(http.StatusInternalServerError, "User ID not found in claims"), nil
+		}
+
+		if postTitle != "" && postContent != "" {
+			post, err := queries.CreatePost(ctx, models.CreatePostParams{
+				Title:    postTitle,
+				Url:      postLink,
+				Content:  postContent,
+				AuthorID: authInfo["user_id"].(int64),
+				Slug: sql.NullString{
+					String: slugify(postTitle),
+					Valid:  true,
+				},
+			})
+			if err != nil {
+				return errorResponse(http.StatusInternalServerError, "Failed to create post"), nil
+			}
+			return jsonResponse(http.StatusOK, post), nil
+		}
+	}
 
 	if email == "" || password == "" {
 		return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
@@ -186,4 +215,16 @@ func getHeader(headers map[string]string, key string) string {
 		}
 	}
 	return ""
+}
+
+func slugify(input string) string {
+	reg, err := regexp.Compile("[^a-zA-Z0-9]+")
+	if err != nil {
+		return input
+	}
+	processedString := reg.ReplaceAllString(input, " ")
+	processedString = strings.TrimSpace(processedString)
+	slug := strings.ReplaceAll(processedString, " ", "-")
+	slug = strings.ToLower(slug)
+	return slug
 }

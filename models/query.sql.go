@@ -37,8 +37,8 @@ RETURNING id, author_id, url, title, content, slug, created_at, updated_at
 type CreatePostParams struct {
 	AuthorID int64
 	Url      string
-	Title    sql.NullString
-	Content  sql.NullString
+	Title    string
+	Content  string
 	Slug     sql.NullString
 }
 
@@ -305,8 +305,8 @@ WHERE id = ?
 
 type UpdatePostParams struct {
 	Url     string
-	Title   sql.NullString
-	Content sql.NullString
+	Title   string
+	Content string
 	Slug    sql.NullString
 	ID      int64
 }
