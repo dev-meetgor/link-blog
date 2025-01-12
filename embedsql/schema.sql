@@ -1,4 +1,4 @@
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     email TEXT UNIQUE NOT NULL,
@@ -7,7 +7,7 @@ CREATE TABLE users (
     updated_at DATETIME
 );
 
-CREATE TABLE posts (
+CREATE TABLE IF NOT EXISTS posts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     author_id INTEGER NOT NULL,
     url TEXT NOT NULL,
@@ -19,12 +19,12 @@ CREATE TABLE posts (
     FOREIGN KEY (author_id) REFERENCES users(id)
 );
 
-CREATE TABLE tags (
+CREATE TABLE IF NOT EXISTS tags (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT UNIQUE NOT NULL
 );
 
-CREATE TABLE post_tags (
+CREATE TABLE IF NOT EXISTS post_tags (
     post_id INTEGER NOT NULL,
     tag_id INTEGER NOT NULL,
     PRIMARY KEY (post_id, tag_id),
