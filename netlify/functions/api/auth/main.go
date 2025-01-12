@@ -37,8 +37,9 @@ func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.
 			}
 		}
 
+		// if token is empty meaning it can be a first login
 		if tokenString == "" {
-			return errorResponse(http.StatusUnauthorized, "Auth cookie missing"), nil
+			return next(req)
 		}
 
 		claims, err := ValidateToken(tokenString, os.Getenv("JWT_SECRET"))
