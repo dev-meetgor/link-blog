@@ -29,7 +29,7 @@ var (
 func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error)) func(events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	return func(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 		var tokenString string
-        log.Printf("req.Headers: %v", req.Headers)
+		log.Printf("req.Headers: %v", req.Headers)
 		cookies := getHeader(req.Headers, "Cookie")
 		log.Printf("cookies: %v", cookies)
 		for _, cookie := range strings.Split(cookies, ";") {
@@ -60,9 +60,12 @@ func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.
 		}
 
 		userID, ok := claims.Claims.(jwt.MapClaims)["user_id"].(float64)
+		log.Printf("userID: %v | ok: %v", userID, ok)
 		if !ok {
 			return errorResponse(http.StatusInternalServerError, "Invalid token claims"), nil
 		}
+
+		log.Printf("SENDING userID: %v", userID)
 
 		req.RequestContext.Authorizer = map[string]interface{}{"user_id": int(userID)}
 		return next(req)
@@ -95,16 +98,18 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	}
 
 	formData, err := url.ParseQuery(req.Body)
+	log.Printf("formData: %v", formData)
 	if err != nil {
 		return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
 	}
-	userName := formData.Get("username")
+	email := formData.Get("email")
 	password := formData.Get("password")
 
-	if userName == "" || password == "" {
+	if email == "" || password == "" {
 		return errorResponse(http.StatusBadRequest, "Invalid form data"), nil
 	}
-	user, err := queries.GetUserByUsername(ctx, userName)
+	user, err := queries.GetUserByEmail(ctx, email)
+	log.Printf("user: %v | err: %v", user, err)
 	if err != nil {
 		return errorResponse(http.StatusInternalServerError, "Database connection failed"), nil
 	}
@@ -113,6 +118,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	}
 
 	token, err := CreateToken(user, os.Getenv("JWT_SECRET"))
+	log.Printf("token: %v | err: %v", token, err)
 	if err != nil {
 		return errorResponse(http.StatusInternalServerError, "Failed to create token"), nil
 	}
@@ -129,6 +135,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 		"Content-Type": "text/plain",
 		"Set-Cookie":   tokenCookie.String(),
 	}
+	log.Printf("header: %v | err: %v", headers, err)
 	return events.APIGatewayProxyResponse{
 		StatusCode: http.StatusOK,
 		Headers:    headers,
