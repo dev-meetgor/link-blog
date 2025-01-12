@@ -106,6 +106,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 	email := formData.Get("email")
 	password := formData.Get("password")
 	authInfo, ok := req.RequestContext.Authorizer["user_id"].(int64)
+	log.Printf("authInfo: %v | ok: %v", authInfo, ok)
 	if !ok {
 		return errorResponse(http.StatusInternalServerError, "Claims not found in authorizer"), nil
 	} else {
@@ -124,6 +125,7 @@ func handler(req events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse,
 					Valid:  true,
 				},
 			})
+			log.Printf("post: %v | err: %v", post, err)
 			if err != nil {
 				return errorResponse(http.StatusInternalServerError, "Failed to create post"), nil
 			}
