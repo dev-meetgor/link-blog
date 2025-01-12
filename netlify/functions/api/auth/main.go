@@ -32,18 +32,21 @@ func TokenValidationMiddleware(next func(events.APIGatewayProxyRequest) (events.
 		for _, cookie := range req.Headers["Cookie"] {
 			c := string(cookie)
 			parts := strings.SplitN(c, "=", 2)
+			log.Printf("parts: %v", parts)
 			if len(parts) == 2 && parts[0] == "auth_token" {
 				tokenString = parts[1]
+				log.Printf("tokenString: %v", tokenString)
 				break
 			}
 		}
 
-		// if token is empty meaning it can be a first login
 		if tokenString == "" {
 			return next(req)
 		}
 
+		log.Printf("tokenString C: %v", tokenString)
 		claims, err := ValidateToken(tokenString, os.Getenv("JWT_SECRET"))
+        log.Printf("tokenString D: %v", tokenString)
 		if err != nil {
 			if err == jwt.ErrSignatureInvalid {
 				return errorResponse(http.StatusUnauthorized, "Invalid token signature"), nil
